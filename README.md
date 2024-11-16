@@ -1,10 +1,20 @@
-# PandasDB
+# PandasDB Web Client
 
-A full-stack application for storing and managing pandas DataFrames with automatic versioning, chunking, and optimized storage patterns.
+A modern React TypeScript web application for visualizing and managing pandas DataFrames stored in AWS. Built with React, TypeScript, and Tailwind CSS.
 
-## Architecture Overview
+![PandasDB Interface](public/app-screenshot.png)
 
-### Frontend (React + TypeScript)
+## Features
+
+- 📊 DataFrame visualization and management
+- 🔄 Real-time data synchronization
+- 🌓 Dark mode interface
+- 🔐 Cognito authentication
+- 📱 Responsive design
+- 🔌 Offline mode with fixtures
+
+## Project Structure
+
 ```
 pandasdb-web-client/
 ├── src/
@@ -14,8 +24,8 @@ pandasdb-web-client/
 │   ├── context/          # React context providers
 │   │   └── AuthContext.tsx
 │   ├── pages/            # Application routes
-│   │   ├── DBs.tsx
-│   │   ├── DBView.tsx
+│   │   ├── DBs.tsx       # DataFrame list view
+│   │   ├── DBView.tsx    # DataFrame detail view
 │   │   ├── Login.tsx
 │   │   └── ResetPassword.tsx
 │   ├── services/         # API integration
@@ -29,23 +39,15 @@ pandasdb-web-client/
 └── public/              # Static assets
 ```
 
-### Backend (AWS Serverless)
-Serverless AWS infrastructure providing:
-- API Gateway endpoints
-- Lambda functions for data processing
-- S3 storage with automatic chunking
-- DynamoDB for metadata
-- Cognito user authentication
-
 ## Getting Started
 
 ### Prerequisites
-- Node.js ≥ 14.x
-- Python 3.9+
-- AWS Account
-- AWS CLI configured
 
-### Frontend Setup
+- Node.js ≥ 14.x
+- Python 3.9+ (for admin scripts)
+- AWS Cognito User Pool
+
+### Installation
 
 1. Clone the repository:
 ```bash
@@ -58,7 +60,7 @@ cd pandasdb-web-client
 npm install
 ```
 
-3. Create a `.env` file:
+3. Create a `.env` file in the project root:
 ```env
 REACT_APP_API_URL=https://your-api-gateway-url.amazonaws.com
 REACT_APP_COGNITO_USER_POOL_ID=your-user-pool-id
@@ -66,31 +68,21 @@ REACT_APP_COGNITO_CLIENT_ID=your-client-id
 REACT_APP_AWS_REGION=eu-west-1
 ```
 
-4. Start development server:
+4. Start the development server:
 ```bash
 npm run dev
 ```
 
-### Backend Deployment
-
-1. Install Serverless Framework:
-```bash
-npm install -g serverless
-```
-
-2. Deploy the backend:
-```bash
-serverless deploy --stage dev --region eu-west-1
-```
-
 ### Demo User Setup
+
+For testing purposes, you can create a demo user:
 
 1. Navigate to scripts directory:
 ```bash
 cd scripts
 ```
 
-2. Create virtual environment:
+2. Set up Python virtual environment:
 ```bash
 python -m venv .venv
 source .venv/bin/activate  # On Unix/MacOS
@@ -98,7 +90,7 @@ source .venv/bin/activate  # On Unix/MacOS
 .venv\Scripts\activate     # On Windows
 ```
 
-3. Install dependencies:
+3. Install script dependencies:
 ```bash
 pip install -r requirements.txt
 ```
@@ -112,82 +104,91 @@ Default demo credentials:
 - Email: user@test.com
 - Password: Test123!
 
-## Features
+## Available Scripts
 
-### DataFrame Management
-- Automatic versioning
-- Chunked storage for large datasets
-- Optimized storage patterns
-- Version control with keep-last option
+```bash
+# Start development server
+npm run dev
 
-### Security
-- Cognito authentication
-- Per-user data isolation
-- CORS protection
-- Request validation
+# Build for production
+npm run build
 
-### User Interface
-- Modern React components
-- Dark mode design
-- Responsive layout
-- Real-time API status indicators
+# Run tests
+npm test
 
-## API Endpoints
+# Run linting
+npm run lint
 
-### Upload DataFrame
-```http
-POST /dataframes/upload
-```
-
-Parameters:
-- `dataframe`: CSV or JSON data
-- `dataframe_name`: Storage path
-- `columns_keys`: Partitioning configuration
-- `external_key`: Version identifier
-- `keep_last`: Version retention flag
-
-### Get DataFrame
-```http
-GET /dataframes/{name}
-```
-
-Parameters:
-- `name`: DataFrame path
-- `external_key`: (optional) Version filter
-- `use_last`: (optional) Latest version flag
-
-## Storage Patterns
-
-### Version Control Structure
-```
-bucket/
-└── {dataframe_name}/
-    └── external_key/
-        └── default/
-            ├── YYYY-MM-DD/
-            │   └── HH:MM:SS_{chunk_uuid}.csv.gz
-            └── last_key.txt
+# Format code
+npm run format
 ```
 
 ## Development
 
-### Running Tests
-```bash
-# Frontend tests
-npm test
+### Using Fixtures
 
-# Backend tests
-python -m pytest
+The application includes a fixture system for development without a backend:
+
+1. Set environment variable:
+```env
+REACT_APP_USE_FIXTURES=true
 ```
 
-### Local Development
-```bash
-# Frontend
-npm run dev
+2. The app will now use mock data from `src/fixtures/data.ts`
 
-# Backend
-serverless offline start
+### Component Development
+
+Components use Tailwind CSS for styling. Key conventions:
+
+- Use Tailwind's utility classes
+- Maintain dark mode compatibility
+- Follow responsive design patterns
+- Use shadcn/ui components when available
+
+Example:
+```tsx
+const MyComponent = () => {
+  return (
+    <div className="bg-gray-800 rounded-lg p-4">
+      <h2 className="text-xl font-bold text-white">Title</h2>
+    </div>
+  );
+};
 ```
+
+## Authentication
+
+The app uses AWS Cognito for authentication. Key files:
+
+- `src/context/AuthContext.tsx`: Authentication context provider
+- `src/pages/Login.tsx`: Login page implementation
+- `src/services/api.ts`: API calls with auth headers
+
+## API Integration
+
+API calls are centralized in `src/services/api.ts`. Example usage:
+
+```typescript
+import { api } from '../services/api';
+
+// Get DataFrame
+const data = await api.getDataFrame('my-dataframe');
+
+// Upload DataFrame
+await api.uploadDataFrame({
+  dataframe: myData,
+  dataframe_name: 'new-dataframe'
+});
+```
+
+## Building for Production
+
+1. Update environment variables for production
+2. Build the application:
+```bash
+npm run build
+```
+3. The build output will be in the `dist` directory
 
 ## Contributing
 
@@ -197,20 +198,39 @@ serverless offline start
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## License
+## Troubleshooting
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+Common issues and solutions:
+
+1. **API Connection Issues**
+   - Check `.env` configuration
+   - Verify API Gateway URL
+   - Check API Status Indicator
+
+2. **Authentication Problems**
+   - Verify Cognito credentials
+   - Check browser console for errors
+   - Ensure user is confirmed in Cognito
+
+3. **Development Mode Issues**
+   - Clear browser cache
+   - Check Node.js version
+   - Verify dependencies installation
 
 ## Support
 
 For support:
-- Open an issue
-- Contact maintainers
+- Open an issue on GitHub
 - Check documentation
+- Contact development team
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Acknowledgments
 
-- AWS Serverless Framework
-- Pandas Development Team
-- React and TypeScript communities
-- Contributors
+- React Community
+- Tailwind CSS Team
+- shadcn/ui Components
+- AWS Amplify Team
