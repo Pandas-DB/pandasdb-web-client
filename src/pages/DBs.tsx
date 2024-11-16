@@ -1,43 +1,87 @@
-// import React from 'react';
+// src/components/DBs.tsx
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Database } from 'lucide-react';
+import { api } from '../services/api';
+import APIStatusIndicator from './APIStatusIndicator';
 
-interface DB {
-  id: string;
-  name: string;
-  items?: number;
+interface DataFrameMetadata {
+  df_name: string;
+  total_rows: number;
+  created_at: string;
+  metadata?: {
+    chunks: Array<{
+      name: string;
+      size: string;
+      lastModified: string;
+      rows: number;
+    }>;
+  };
 }
 
-const DBs = () => {
+const DBs: React.FC = () => {
   const navigate = useNavigate();
+  const [dataFrames, setDataFrames] = useState<DataFrameMetadata[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isUsingFixtures, setIsUsingFixtures] = useState(false);
 
-  const dbs: DB[] = [
-    { id: '550e8400-e29b-41d4-a716-446655440000', name: 'Orders' },
-    { id: '6ba7b810-9dad-11d1-80b4-00c04fd430c8', name: 'Products' },
-  ];
+  useEffect(() => {
+    const fetchDataFrames = async () => {
+      try {
+        const data = await api.getDataFrames();
+        setDataFrames(data);
+        setIsUsingFixtures(!process.env.REACT_APP_API_URL || process.env.REACT_APP_USE_FIXTURES === 'true');
+      } catch (err) {
+        setError('Failed to fetch databases');
+        setIsUsingFixtures(true);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDataFrames();
+  }, []);
+
+  if (loading) {
+    return <div className="text-center">Loading...</div>;
+  }
+
+  if (error) {
+    return <div className="text-red-500">{error}</div>;
+  }
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">DBs</h1>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {dbs.map((db) => (
+        {dataFrames.map((df) => (
           <button
-            key={db.id}
-            onClick={() => navigate(`/dbs/${db.id}`)}
+            key={df.df_name}
+            onClick={() => navigate(`/dbs/${df.df_name}`)}
             className="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition-colors text-left w-full"
           >
             <div className="flex items-center space-x-3">
               <Database className="w-6 h-6 text-blue-500 flex-shrink-0" />
               <div>
-                <h3 className="font-medium">{db.name}</h3>
-                {db.items !== undefined && (
-                  <p className="text-sm text-gray-400">{db.items} items</p>
+                <h3 className="font-medium">{df.df_name}</h3>
+                <p className="text-sm text-gray-400">
+                  {df.total_rows.toLocaleString()} rows
+                </p>
+                <p className="text-xs text-gray-500">
+                  Last updated: {new Date(df.created_at).toLocaleDateString()}
+                </p>
+                {df.metadata?.chunks && (
+                  <p className="text-xs text-gray-500">
+                    {df.metadata.chunks.length} chunks
+                  </p>
                 )}
               </div>
             </div>
           </button>
         ))}
       </div>
+      <APIStatusIndicator isUsingFixtures={isUsingFixtures} />
     </div>
   );
 };

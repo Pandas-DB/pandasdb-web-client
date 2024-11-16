@@ -1,71 +1,104 @@
-// import React from 'react';
+// src/pages/DBView.tsx
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FileSpreadsheet, ArrowLeft } from 'lucide-react';
+import { api } from '../services/api';
+import APIStatusIndicator from '../components/APIStatusIndicator';
 
-interface DataFile {
-  id: string;
-  name: string;
-  size: string;
-  lastModified: string;
+interface DataFrame {
+  data: any[];
+  metadata: {
+    total_rows: number;
+    chunks: Array<{
+      path: string;
+      rows: number;
+      number: number;
+    }>;
+  };
 }
 
-const DBView = () => {
-  const { id } = useParams();
+const DBView: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [dataFrame, setDataFrame] = useState<DataFrame | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isUsingFixtures, setIsUsingFixtures] = useState(false);
 
-  const getDBFiles = (dbId: string): { name: string; files: DataFile[] } => {
-    if (dbId === '550e8400-e29b-41d4-a716-446655440000') {
-      return {
-        name: 'Orders',
-        files: [
-          {
-            id: '1',
-            name: 'Month to date orders',
-            size: '2.3MB',
-            lastModified: '2024-03-15',
-          },
-          {
-            id: '2',
-            name: 'Daily orders',
-            size: '1.1MB',
-            lastModified: '2024-03-15',
-          },
-          {
-            id: '3',
-            name: 'Customer 123 Orders',
-            size: '856KB',
-            lastModified: '2024-03-15',
-          },
-        ],
-      };
-    }
-    return {
-      name: 'Products',
-      files: [],
+  useEffect(() => {
+    const fetchDataFrame = async () => {
+      if (!id) return;
+      
+      try {
+        const data = await api.getDataFrame(id, { use_last: true });
+        setDataFrame(data);
+        setIsUsingFixtures(!process.env.REACT_APP_API_URL || process.env.REACT_APP_USE_FIXTURES === 'true');
+      } catch (err) {
+        setError('Failed to fetch dataframe');
+        setIsUsingFixtures(true);
+      } finally {
+        setLoading(false);
+      }
     };
-  };
 
-  const db = getDBFiles(id || '');
+    fetchDataFrame();
+  }, [id]);
 
-  const handleDownload = (name: string) => {
-    const csvContent = `timestamp,order_id,customer,amount
-${new Date().toISOString()},ORD-001,Customer A,150.00
-${new Date().toISOString()},ORD-002,Customer B,275.50
-${new Date().toISOString()},ORD-003,Customer C,89.99`;
+  const handleDownload = async (format: 'csv' | 'json') => {
+    if (!dataFrame || !id) return;
 
-    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const content = format === 'csv' 
+      ? convertToCSV(dataFrame.data)
+      : JSON.stringify(dataFrame.data, null, 2);
+    
+    const type = format === 'csv' ? 'text/csv' : 'application/json';
+    const extension = format === 'csv' ? 'csv' : 'json';
+    
+    const blob = new Blob([content], { type });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${name.toLowerCase().replace(/\s+/g, '_')}.csv`;
+    a.download = `${id}.${extension}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
   };
 
+  const convertToCSV = (data: any[]) => {
+    if (data.length === 0) return '';
+    
+    const headers = Object.keys(data[0]);
+    const rows = data.map(row => 
+      headers.map(header => {
+        const value = row[header];
+        return typeof value === 'string' && value.includes(',') 
+          ? `"${value}"`
+          : value;
+      }).join(',')
+    );
+    
+    return [headers.join(','), ...rows].join('\n');
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center text-gray-400">Loading...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-red-500">{error}</div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       <div className="flex items-center space-x-4">
         <button
           onClick={() => navigate('/dbs')}
@@ -74,31 +107,81 @@ ${new Date().toISOString()},ORD-003,Customer C,89.99`;
           <ArrowLeft className="w-5 h-5" />
           <span>Back to DBs</span>
         </button>
-        <h1 className="text-2xl font-bold">{db.name}</h1>
+        <h1 className="text-2xl font-bold">{id}</h1>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {db.files.map((file) => (
-          <button
-            key={file.id}
-            onClick={() => handleDownload(file.name)}
-            className="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition-colors text-left w-full"
-          >
-            <div className="flex items-center space-x-3">
-              <FileSpreadsheet className="w-6 h-6 text-blue-500 flex-shrink-0" />
+
+      {dataFrame && (
+        <div className="space-y-6">
+          <div className="bg-gray-800 rounded-lg p-6">
+            <h2 className="text-lg font-medium mb-4">DataFrame Info</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <h3 className="font-medium">{file.name}</h3>
-                <div className="flex items-center space-x-2 mt-1">
-                  <span className="text-sm text-gray-400">{file.size}</span>
-                  <span className="text-gray-500">•</span>
-                  <span className="text-sm text-gray-400">
-                    {new Date(file.lastModified).toLocaleDateString()}
-                  </span>
-                </div>
+                <p className="text-gray-400">Total Rows</p>
+                <p className="text-xl font-medium">
+                  {dataFrame.metadata.total_rows.toLocaleString()}
+                </p>
+              </div>
+              <div>
+                <p className="text-gray-400">Chunks</p>
+                <p className="text-xl font-medium">
+                  {dataFrame.metadata.chunks.length}
+                </p>
               </div>
             </div>
-          </button>
-        ))}
-      </div>
+          </div>
+
+          <div className="flex flex-wrap gap-4">
+            <button
+              onClick={() => handleDownload('csv')}
+              className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+            >
+              <FileSpreadsheet className="w-5 h-5" />
+              <span>Download CSV</span>
+            </button>
+            <button
+              onClick={() => handleDownload('json')}
+              className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+            >
+              <FileSpreadsheet className="w-5 h-5" />
+              <span>Download JSON</span>
+            </button>
+          </div>
+
+          {/* Preview table */}
+          <div className="bg-gray-800 rounded-lg overflow-hidden">
+            <div className="p-4 border-b border-gray-700">
+              <h3 className="font-medium">Data Preview</h3>
+              <p className="text-sm text-gray-400">Showing first 10 rows</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-900">
+                    {dataFrame.data[0] && Object.keys(dataFrame.data[0]).map(header => (
+                      <th key={header} className="px-4 py-3 text-left text-sm font-medium text-gray-300">
+                        {header}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {dataFrame.data.slice(0, 10).map((row, i) => (
+                    <tr key={i} className="border-t border-gray-700 hover:bg-gray-750">
+                      {Object.values(row).map((value: any, j) => (
+                        <td key={j} className="px-4 py-3 text-sm">
+                          {typeof value === 'object' ? JSON.stringify(value) : value}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      <APIStatusIndicator isUsingFixtures={isUsingFixtures} />
     </div>
   );
 };
