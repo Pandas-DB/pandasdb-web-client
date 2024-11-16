@@ -4,12 +4,10 @@ frontend:
     preBuild:
       commands:
         - npm cache clean --force
-        - rm -rf node_modules
+        - rm -rf node_modules package-lock.json
         - npm install --legacy-peer-deps
-        - npm install -g typescript
     build:
       commands:
-        - echo "REACT_APP_API_URL=$REACT_APP_API_URL" >> .env
         - npm run build
   artifacts:
     baseDirectory: build
@@ -18,4 +16,3 @@ frontend:
   cache:
     paths:
       - node_modules/**/*
-      - .npm/**/*
